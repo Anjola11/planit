@@ -1,11 +1,13 @@
-# ðŸ” Authentication API Documentation
+# 🔐 Authentication API Documentation
 
-Base URL:
+## Base URL
 ```
 /api/auth
 ```
 
-All responses follow this format:
+## Response Format
+
+### Success Response
 ```json
 {
   "success": true,
@@ -13,7 +15,8 @@ All responses follow this format:
   "data": { ... }
 }
 ```
-If an error occurs:
+
+### Error Response
 ```json
 {
   "success": false,
@@ -23,8 +26,13 @@ If an error occurs:
 
 ---
 
-### **1ï¸âƒ£ POST /signup**
-**Description:** Register a new user.
+## 📋 Endpoints
+
+### 1️⃣ User Registration
+
+**POST** `/signup`
+
+Register a new user account.
 
 **Access:** Public
 
@@ -59,13 +67,16 @@ If an error occurs:
 ```
 
 **Error Responses:**
-- 409 â€” Email already exists
-- 400 â€” Validation error
+- `409` — Email already exists
+- `400` — Validation error
 
 ---
 
-### **2ï¸âƒ£ POST /login**
-**Description:** Authenticate an existing user.
+### 2️⃣ User Login
+
+**POST** `/login`
+
+Authenticate an existing user.
 
 **Access:** Public
 
@@ -97,13 +108,16 @@ If an error occurs:
 ```
 
 **Error Responses:**
-- 401 â€” Invalid email or password
-- 403 â€” Account deactivated
+- `401` — Invalid email or password
+- `403` — Account deactivated
 
 ---
 
-### **3ï¸âƒ£ POST /refresh**
-**Description:** Generate a new access token using a valid refresh token.
+### 3️⃣ Refresh Token
+
+**POST** `/refresh`
+
+Generate a new access token using a valid refresh token.
 
 **Access:** Public
 
@@ -127,12 +141,15 @@ If an error occurs:
 ```
 
 **Error Responses:**
-- 401 â€” Invalid or expired refresh token
+- `401` — Invalid or expired refresh token
 
 ---
 
-### **4ï¸âƒ£ POST /logout**
-**Description:** Logout user by revoking the provided refresh token.
+### 4️⃣ Logout
+
+**POST** `/logout`
+
+Logout user by revoking the provided refresh token.
 
 **Access:** Private (requires Bearer token)
 
@@ -158,8 +175,11 @@ Authorization: Bearer <ACCESS_TOKEN>
 
 ---
 
-### **5ï¸âƒ£ POST /logout-all**
-**Description:** Logout user from all devices (revokes all refresh tokens).
+### 5️⃣ Logout All Devices
+
+**POST** `/logout-all`
+
+Logout user from all devices (revokes all refresh tokens).
 
 **Access:** Private
 
@@ -178,8 +198,11 @@ Authorization: Bearer <ACCESS_TOKEN>
 
 ---
 
-### **6ï¸âƒ£ GET /me**
-**Description:** Fetch the authenticated user's profile.
+### 6️⃣ Get Current User
+
+**GET** `/me`
+
+Fetch the authenticated user's profile.
 
 **Access:** Private
 
@@ -206,8 +229,11 @@ Authorization: Bearer <ACCESS_TOKEN>
 
 ---
 
-### **7ï¸âƒ£ PUT /profile**
-**Description:** Update user profile information.
+### 7️⃣ Update Profile
+
+**PUT** `/profile`
+
+Update user profile information.
 
 **Access:** Private
 
@@ -241,8 +267,11 @@ Authorization: Bearer <ACCESS_TOKEN>
 
 ---
 
-### **8ï¸âƒ£ PUT /change-password**
-**Description:** Change the logged-in userâ€™s password.
+### 8️⃣ Change Password
+
+**PUT** `/change-password`
+
+Change the logged-in user's password.
 
 **Access:** Private
 
@@ -268,14 +297,14 @@ Authorization: Bearer <ACCESS_TOKEN>
 ```
 
 **Error Responses:**
-- 401 â€” Incorrect current password
+- `401` — Incorrect current password
 
 ---
 
-## ðŸ§© Middleware Summary
+## 🧩 Middleware Summary
 
 | Middleware | Purpose | Access |
-|-------------|----------|--------|
+|------------|---------|--------|
 | `authenticate` | Verifies access token and attaches user info to `req.user` | Required for private routes |
 | `optionalAuth` | Attaches user if token exists, else continues | Optional |
 | `requireRole('admin')` | Restrict access to admin users | Protected routes |
@@ -284,10 +313,10 @@ Authorization: Bearer <ACCESS_TOKEN>
 
 ---
 
-## ðŸ§  Error Handling
+## 🧠 Error Handling
 
 | Error Type | HTTP Code | Example Message |
-|-------------|------------|----------------|
+|------------|-----------|-----------------|
 | `ValidationError` | 400 | Invalid input |
 | `AuthenticationError` | 401 | Invalid or expired token |
 | `AuthorizationError` | 403 | Access denied |
@@ -297,9 +326,9 @@ Authorization: Bearer <ACCESS_TOKEN>
 
 ---
 
-## ðŸ§± Roles
+## 🧱 User Roles
 
-```js
+```javascript
 const { ROLES } = require('../models/User');
 
 ROLES = {
@@ -308,3 +337,22 @@ ROLES = {
   VENDOR: 'vendor'
 }
 ```
+
+---
+
+## 🔑 Authentication Flow
+
+1. **Registration/Login** → Receive `accessToken` and `refreshToken`
+2. **API Requests** → Include `Authorization: Bearer <ACCESS_TOKEN>` header
+3. **Token Expiry** → Use `/refresh` endpoint with `refreshToken` to get new tokens
+4. **Logout** → Call `/logout` or `/logout-all` to revoke tokens
+
+---
+
+## 📝 Notes
+
+- All timestamps are in ISO 8601 format
+- Access tokens are short-lived (recommended: 15 minutes)
+- Refresh tokens are long-lived (recommended: 7 days)
+- Passwords must meet minimum security requirements
+- Phone numbers should include country code
