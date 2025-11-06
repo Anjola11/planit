@@ -35,6 +35,28 @@ const signupValidation = [
     .withMessage('Profile picture must be a valid URL')
 ];
 
+// Validation middleware for email verification
+const verifyEmailValidation = [
+  body('userId')
+    .notEmpty()
+    .withMessage('User ID is required'),
+  
+  body('otp')
+    .notEmpty()
+    .withMessage('OTP code is required')
+    .isLength({ min: 6, max: 6 })
+    .withMessage('OTP code must be 6 digits')
+    .isNumeric()
+    .withMessage('OTP code must contain only numbers')
+];
+
+// Validation middleware for resend OTP
+const resendOTPValidation = [
+  body('userId')
+    .notEmpty()
+    .withMessage('User ID is required')
+];
+
 // Validation middleware for login
 const loginValidation = [
   body('email')
@@ -47,8 +69,8 @@ const loginValidation = [
     .withMessage('Password is required')
 ];
 
-// Validation middleware for password reset request
-const resetPasswordRequestValidation = [
+// Validation middleware for forgot password
+const forgotPasswordValidation = [
   body('email')
     .isEmail()
     .normalizeEmail()
@@ -57,9 +79,18 @@ const resetPasswordRequestValidation = [
 
 // Validation middleware for password reset
 const resetPasswordValidation = [
-  body('token')
+  body('email')
+    .isEmail()
+    .normalizeEmail()
+    .withMessage('Please provide a valid email'),
+  
+  body('resetCode')
     .notEmpty()
-    .withMessage('Reset token is required'),
+    .withMessage('Reset code is required')
+    .isLength({ min: 6, max: 6 })
+    .withMessage('Reset code must be 6 digits')
+    .isNumeric()
+    .withMessage('Reset code must contain only numbers'),
   
   body('newPassword')
     .isLength({ min: 8 })
@@ -107,8 +138,10 @@ const validate = (req, res, next) => {
 
 module.exports = {
   signupValidation,
+  verifyEmailValidation,
+  resendOTPValidation,
   loginValidation,
-  resetPasswordRequestValidation,
+  forgotPasswordValidation,
   resetPasswordValidation,
   changePasswordValidation,
   refreshTokenValidation,

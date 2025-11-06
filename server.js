@@ -10,17 +10,7 @@ const PORT = process.env.PORT || 5000;
 
 // Start server
 const server = app.listen(PORT, () => {
-  console.log(`
-╔═══════════════════════════════════════════════════════╗
-║                                                       ║
-║   🎉 Event Management API Server                     ║
-║                                                       ║
-║   🚀 Server running on port ${PORT}                     ║
-║   📝 Environment: ${process.env.NODE_ENV || 'development'}                  ║
-║   ✅ Health Check: http://localhost:${PORT}/health      ║
-║                                                       ║
-╚═══════════════════════════════════════════════════════╝
-  `);
+  console.log(`🚀 Server running on port ${PORT} `);
 });
 
 // Handle unhandled promise rejections

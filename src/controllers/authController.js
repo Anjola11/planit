@@ -1,6 +1,63 @@
 const { User, ROLES } = require('../models/User');
 const TokenManager = require('../utils/tokenManager');
-const { ConflictError, AuthenticationError, NotFoundError } = require('../middleware/errorHandler');
+const { sendOtpEmail, sendWelcomeEmail, sendPasswordResetEmail } = require('../utils/emailService');
+const { ConflictError, AuthenticationError, NotFoundError, ValidationError } = require('../middleware/errorHandler');
+const { db, collections } = require('../config/firebase');
+
+/**
+ * Generate 6-digit OTP
+ */
+const generateOTP = () => {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+};
+
+/**
+ * Store OTP in database
+ */
+const storeOTP = async (userId, otp, type = 'email_verification') => {
+  const expiresAt = new Date();
+  expiresAt.setMinutes(expiresAt.getMinutes() + 10); // 10 minutes expiry
+
+  await db().collection('otps').add({
+    userId,
+    otp,
+    type,
+    createdAt: new Date().toISOString(),
+    expiresAt: expiresAt.toISOString(),
+    used: false
+  });
+};
+
+/**
+ * Verify OTP
+ */
+const verifyOTP = async (userId, otp, type = 'email_verification') => {
+  const snapshot = await db()
+    .collection('otps')
+    .where('userId', '==', userId)
+    .where('otp', '==', otp)
+    .where('type', '==', type)
+    .where('used', '==', false)
+    .limit(1)
+    .get();
+
+  if (snapshot.empty) {
+    return { valid: false, message: 'Invalid OTP code' };
+  }
+
+  const otpDoc = snapshot.docs[0];
+  const otpData = otpDoc.data();
+  const expiresAt = new Date(otpData.expiresAt);
+
+  if (expiresAt < new Date()) {
+    return { valid: false, message: 'OTP code has expired' };
+  }
+
+  // Mark OTP as used
+  await otpDoc.ref.update({ used: true });
+
+  return { valid: true };
+};
 
 /**
  * @desc    Register a new user
@@ -25,26 +82,95 @@ const signup = async (req, res) => {
     phoneNumber
   });
 
+  // Generate and send OTP
+  const otp = generateOTP();
+  await storeOTP(user.id, otp);
+  await sendOtpEmail(email, otp, fullName);
+
+  res.status(201).json({
+    success: true,
+    message: 'User registered successfully. Please check your email for verification code.',
+    data: {
+      userId: user.id,
+      email: user.email,
+      emailVerified: false
+    }
+  });
+};
+
+/**
+ * @desc    Verify email with OTP
+ * @route   POST /api/auth/verify-email
+ * @access  Public
+ */
+const verifyEmail = async (req, res) => {
+  const { userId, otp } = req.body;
+
+  // Verify OTP
+  const verification = await verifyOTP(userId, otp);
+  
+  if (!verification.valid) {
+    throw new ValidationError(verification.message);
+  }
+
+  // Update user's email verification status
+  await User.update(userId, { emailVerified: true });
+
+  // Get updated user
+  const user = await User.findById(userId);
+
+  // Send welcome email
+  await sendWelcomeEmail(user.email, user.fullName);
+
   // Generate tokens
   const { accessToken, refreshToken } = TokenManager.generateTokens(user);
 
   // Store refresh token
   await TokenManager.storeRefreshToken(user.id, refreshToken);
 
-  res.status(201).json({
+  res.status(200).json({
     success: true,
-    message: 'User registered successfully',
+    message: 'Email verified successfully',
     data: {
       user: {
         id: user.id,
         email: user.email,
         fullName: user.fullName,
         role: user.role,
-        phoneNumber: user.phoneNumber
+        phoneNumber: user.phoneNumber,
+        emailVerified: user.emailVerified
       },
       accessToken,
       refreshToken
     }
+  });
+};
+
+/**
+ * @desc    Resend verification OTP
+ * @route   POST /api/auth/resend-otp
+ * @access  Public
+ */
+const resendOTP = async (req, res) => {
+  const { userId } = req.body;
+
+  const user = await User.findById(userId);
+  if (!user) {
+    throw new NotFoundError('User not found');
+  }
+
+  if (user.emailVerified) {
+    throw new ValidationError('Email is already verified');
+  }
+
+  // Generate and send new OTP
+  const otp = generateOTP();
+  await storeOTP(user.id, otp);
+  await sendOtpEmail(user.email, otp, user.fullName);
+
+  res.status(200).json({
+    success: true,
+    message: 'Verification code sent successfully'
   });
 };
 
@@ -73,6 +199,11 @@ const login = async (req, res) => {
     throw new AuthenticationError('Invalid email or password');
   }
 
+  // Check if email is verified
+  if (!user.emailVerified) {
+    throw new AuthenticationError('Please verify your email before logging in');
+  }
+
   // Generate tokens
   const { accessToken, refreshToken } = TokenManager.generateTokens(user);
 
@@ -93,6 +224,66 @@ const login = async (req, res) => {
       accessToken,
       refreshToken
     }
+  });
+};
+
+/**
+ * @desc    Request password reset
+ * @route   POST /api/auth/forgot-password
+ * @access  Public
+ */
+const forgotPassword = async (req, res) => {
+  const { email } = req.body;
+
+  const user = await User.findByEmail(email);
+  if (!user) {
+    // Don't reveal if user exists
+    return res.status(200).json({
+      success: true,
+      message: 'If an account exists with this email, a password reset code has been sent.'
+    });
+  }
+
+  // Generate and send reset code
+  const resetCode = generateOTP();
+  await storeOTP(user.id, resetCode, 'password_reset');
+  await sendPasswordResetEmail(user.email, resetCode);
+
+  res.status(200).json({
+    success: true,
+    message: 'Password reset code sent to your email'
+  });
+};
+
+/**
+ * @desc    Reset password with code
+ * @route   POST /api/auth/reset-password
+ * @access  Public
+ */
+const resetPassword = async (req, res) => {
+  const { email, resetCode, newPassword } = req.body;
+
+  const user = await User.findByEmail(email);
+  if (!user) {
+    throw new NotFoundError('User not found');
+  }
+
+  // Verify reset code
+  const verification = await verifyOTP(user.id, resetCode, 'password_reset');
+  
+  if (!verification.valid) {
+    throw new ValidationError(verification.message);
+  }
+
+  // Update password
+  await User.updatePassword(user.id, newPassword);
+
+  // Revoke all refresh tokens
+  await TokenManager.revokeAllUserTokens(user.id);
+
+  res.status(200).json({
+    success: true,
+    message: 'Password reset successfully. Please login with your new password.'
   });
 };
 
@@ -252,7 +443,11 @@ const changePassword = async (req, res) => {
 
 module.exports = {
   signup,
+  verifyEmail,
+  resendOTP,
   login,
+  forgotPassword,
+  resetPassword,
   refreshToken,
   logout,
   logoutAll,
