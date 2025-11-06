@@ -1,12 +1,29 @@
 const nodemailer = require('nodemailer');
 
-// Create transporter
+// Create transporter with better timeout settings
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
   },
+  // Add these for Railway
+  port: 587,
+  secure: false,
+  tls: {
+    rejectUnauthorized: false
+  },
+  connectionTimeout: 10000, // 10 seconds
+  greetingTimeout: 10000
+});
+
+// Verify transporter on startup
+transporter.verify(function(error, success) {
+  if (error) {
+    console.error('❌ SMTP Configuration Error:', error);
+  } else {
+    console.log('✅ Email service is ready');
+  }
 });
 
 /**
@@ -26,7 +43,8 @@ async function sendEmail(to, subject, textContent) {
     return true;
   } catch (error) {
     console.error('❌ Error sending email:', error);
-    throw new Error('Failed to send email');
+    // Don't throw error - just log it so signup can continue
+    return false;
   }
 }
 
@@ -45,7 +63,7 @@ If you didn't request this code, please ignore this email.
 Best regards,
 The Planit Team`;
 
-  await sendEmail(userEmail, 'Planit - Email Verification Code', textContent);
+  return await sendEmail(userEmail, 'Planit - Email Verification Code', textContent);
 }
 
 /**
@@ -61,7 +79,7 @@ Planit helps you manage events, tasks, and everything in between. Get started by
 Best regards,
 The Planit Team`;
 
-  await sendEmail(userEmail, 'Welcome to Planit!', textContent);
+  return await sendEmail(userEmail, 'Welcome to Planit!', textContent);
 }
 
 /**
@@ -79,7 +97,7 @@ This code will expire in 15 minutes. If you didn't request this, please ignore t
 Best regards,
 The Planit Team`;
 
-  await sendEmail(userEmail, 'Planit - Password Reset Request', textContent);
+  return await sendEmail(userEmail, 'Planit - Password Reset Request', textContent);
 }
 
 module.exports = {
