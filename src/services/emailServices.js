@@ -9,7 +9,8 @@ const transporter = nodemailer.createTransport({
   },
   host: 'smtp.gmail.com', 
   port: 465,             
-  secure: true,          
+  secure: true,   
+  debug: true,       
   connectionTimeout: 15000, 
   greetingTimeout: 15000,   
 });
