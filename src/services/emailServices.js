@@ -7,14 +7,11 @@ const transporter = nodemailer.createTransport({
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
   },
-  // Add these for Railway
-  port: 587,
-  secure: false,
-  tls: {
-    rejectUnauthorized: false
-  },
-  connectionTimeout: 10000, // 10 seconds
-  greetingTimeout: 10000
+  host: 'smtp.gmail.com', 
+  port: 465,             
+  secure: true,          
+  connectionTimeout: 15000, 
+  greetingTimeout: 15000,   
 });
 
 // Verify transporter on startup
