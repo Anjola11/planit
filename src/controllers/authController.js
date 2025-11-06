@@ -1,6 +1,6 @@
 const { User, ROLES } = require('../models/User');
 const TokenManager = require('../utils/tokenManager');
-const { sendOtpEmail, sendWelcomeEmail, sendPasswordResetEmail } = require('../utils/emailService');
+const { sendOtpEmail, sendWelcomeEmail, sendPasswordResetEmail } = require('../services/emailServices');
 const { ConflictError, AuthenticationError, NotFoundError, ValidationError } = require('../middleware/errorHandler');
 const { db, collections } = require('../config/firebase');
 
